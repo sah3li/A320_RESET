@@ -1,121 +1,149 @@
-const URLS = {
-    classic: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=766279178&single=true&output=csv',
-    enhanced: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=1566031438&single=true&output=csv'
-};
+// app.js
+const CSV_CLASSIC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=766279178&single=true&output=csv";
+const CSV_ENHANCED = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=1566031438&single=true&output=csv";
 
-let appData = { classic: [], enhanced: [] };
+let dataStore = { classic: [], enhanced: [] };
 let currentTab = 'classic';
 
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.error("SW Registration failed:", err));
-}
-
-window.addEventListener('online', updateNetworkStatus);
-window.addEventListener('offline', updateNetworkStatus);
-
-function updateNetworkStatus() {
-    const banner = document.getElementById('offline-banner');
-    if (!navigator.onLine) {
-        banner.style.display = 'block';
-    } else {
-        banner.style.display = 'none';
-        fetchData();
+document.addEventListener("DOMContentLoaded", () => {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
     }
+
+    checkNetworkStatus();
+    window.addEventListener('online', checkNetworkStatus);
+    window.addEventListener('offline', checkNetworkStatus);
+    
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            currentTab = e.target.getAttribute('data-target');
+            renderCards();
+        });
+    });
+
+    document.getElementById('search').addEventListener('input', renderCards);
+
+    fetchData();
+});
+
+function checkNetworkStatus() {
+    const alert = document.getElementById('offline-alert');
+    alert.style.display = navigator.onLine ? 'none' : 'block';
 }
-updateNetworkStatus();
 
 async function fetchData() {
     try {
-        for (const type in URLS) {
-            const response = await fetch(URLS[type]);
-            const csvText = await response.text();
-            const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-            appData[type] = result.data;
-        }
+        const [classicRes, enhancedRes] = await Promise.all([
+            fetch(CSV_CLASSIC),
+            fetch(CSV_ENHANCED)
+        ]);
+        const classicText = await classicRes.text();
+        const enhancedText = await enhancedRes.text();
+        
+        dataStore.classic = parseCSV(classicText);
+        dataStore.enhanced = parseCSV(enhancedText);
+        
         renderCards();
     } catch (error) {
-        console.error("Error fetching data:", error);
-        if (!navigator.onLine) {
-            alert("Network error: Cannot update data while offline.");
-        }
+        console.error("Fetch failed, relying on Service Worker cache.", error);
     }
 }
 
-function switchTab(tab, btn) {
-    currentTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderCards();
-}
-
-function startTimer(btn, seconds) {
-    if (!seconds || isNaN(seconds)) return;
-    let timeLeft = parseInt(seconds);
-    btn.disabled = true;
-    const originalText = btn.innerHTML;
+function parseCSV(str) {
+    const rows = [];
+    let row = [];
+    let curr = '';
+    let inQuotes = false;
     
-    const interval = setInterval(() => {
-        if (timeLeft <= 0) {
-            clearInterval(interval);
-            btn.innerHTML = "✅ Reset Complete!";
-            btn.classList.add('done');
-            setTimeout(() => { 
-                btn.disabled = false; 
-                btn.innerHTML = originalText; 
-                btn.classList.remove('done'); 
-            }, 4000);
-        } else {
-            btn.innerHTML = `⏳ Wait ${timeLeft}s...`;
-            timeLeft--;
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (char === '"' && str[i+1] === '"') {
+            curr += '"'; i++;
+        } else if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            row.push(curr.trim()); curr = '';
+        } else if (char === '\n' && !inQuotes) {
+            row.push(curr.trim()); rows.push(row); row = []; curr = '';
+        } else if (char !== '\r') {
+            curr += char;
         }
-    }, 1000);
+    }
+    if (curr) row.push(curr.trim());
+    if (row.length > 0) rows.push(row);
+    
+    if (rows.length < 2) return [];
+    const headers = rows[0];
+    return rows.slice(1).map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = r[i] || ''; });
+        return obj;
+    });
 }
 
 function renderCards() {
+    const container = document.getElementById('card-container');
     const query = document.getElementById('search').value.toLowerCase();
-    const container = document.getElementById('container');
+    const items = dataStore[currentTab];
+    
     container.innerHTML = '';
-
-    if (!appData[currentTab].length) return;
-
-    const filteredData = appData[currentTab].filter(row => 
-        Object.values(row).some(val => String(val).toLowerCase().includes(query))
-    );
-
-    filteredData.forEach(row => {
+    
+    items.forEach((item, index) => {
+        if (Object.values(item).join(' ').toLowerCase().indexOf(query) === -1) return;
+        
         const card = document.createElement('div');
         card.className = 'card';
-
-        let cardHTML = `
-            <div class="cb-highlight">
-                <span>FIN: ${row.CB_FIN || '-'}</span>
-                <span>PANEL: ${row.CB_PANEL || '-'}</span>
-                <span>LOC: ${row.CB_LOCATION || '-'}</span>
-            </div>
-        `;
-
-        if (row.Critical_Note && row.Critical_Note.trim() !== '') {
-            cardHTML += `<div class="critical-note">⚠️ ${row.Critical_Note}</div>`;
-        }
-
-        if (row.Timer_Seconds && !isNaN(row.Timer_Seconds)) {
-            cardHTML += `<button class="timer-btn" onclick="startTimer(this, ${row.Timer_Seconds})">⏱️ Start Timer (${row.Timer_Seconds}s)</button>`;
-        }
-
-        cardHTML += `<div class="details-grid">`;
-        Object.keys(row).forEach(key => {
-            cardHTML += `
-                <div class="detail-item">
-                    <strong>${key.replace(/_/g, ' ')}</strong>
-                    ${row[key] || '-'}
-                </div>
-            `;
+        
+        let detailsHtml = '';
+        let criticalHtml = '';
+        let timerSeconds = 0;
+        
+        Object.keys(item).forEach(key => {
+            const keyLower = key.toLowerCase();
+            const val = item[key];
+            
+            if (keyLower === 'timer_seconds') {
+                timerSeconds = parseInt(val, 10) || 0;
+                detailsHtml += `<div class="row-item"><strong>${key}:</strong> <span>${val}</span></div>`;
+            } else if (keyLower === 'critical_note') {
+                if (val && val.trim() !== '') {
+                    criticalHtml = `<div class="critical-note">⚠️ ${val}</div>`;
+                }
+                detailsHtml += `<div class="row-item"><strong>${key}:</strong> <span>${val}</span></div>`;
+            } else {
+                let isHighlight = ['cb_fin', 'cb_panel', 'cb_location'].includes(keyLower);
+                let valClass = isHighlight ? 'cb-highlight' : '';
+                detailsHtml += `<div class="row-item"><strong>${key}:</strong> <span class="${valClass}">${val}</span></div>`;
+            }
         });
-        cardHTML += `</div>`;
+        
+        let timerHtml = timerSeconds > 0 
+            ? `<button class="timer-btn" id="btn-${currentTab}-${index}" onclick="startTimer(this, ${timerSeconds})">Start Timer (${timerSeconds}s)</button>`
+            : '';
 
-        card.innerHTML = cardHTML;
+        card.innerHTML = `
+            <div class="card-details">${detailsHtml}</div>
+            ${criticalHtml}
+            ${timerHtml}
+        `;
         container.appendChild(card);
     });
 }
 
-fetchData();
+window.startTimer = function(btn, seconds) {
+    btn.disabled = true;
+    let left = seconds;
+    btn.innerText = `Wait... ${left}s`;
+    
+    const interval = setInterval(() => {
+        left--;
+        btn.innerText = `Wait... ${left}s`;
+        if (left <= 0) {
+            clearInterval(interval);
+            btn.innerText = "Time's up! Reset Complete.";
+            btn.classList.add('done');
+        }
+    }, 1000);
+}
