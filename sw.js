@@ -1,4 +1,4 @@
-const CACHE_NAME = 'a320-reset-v1';
+const CACHE_NAME = 'a320-reset-v4';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -26,7 +26,6 @@ self.addEventListener('fetch', event => {
     const isGoogleSheet = event.request.url.includes('docs.google.com/spreadsheets');
 
     if (isGoogleSheet) {
-        // Network First strategy for CSV data
         event.respondWith(
             fetch(event.request)
                 .then(response => {
@@ -34,10 +33,9 @@ self.addEventListener('fetch', event => {
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clonedRes));
                     return response;
                 })
-                .catch(() => caches.match(event.request)) // Fallback to cache if offline
+                .catch(() => caches.match(event.request))
         );
     } else {
-        // Cache First strategy for App Assets
         event.respondWith(
             caches.match(event.request).then(cachedResponse => {
                 return cachedResponse || fetch(event.request);
