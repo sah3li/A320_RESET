@@ -1,0 +1,13 @@
+{
+  "name": "A320 RESET",
+  "short_name": "A320_RESET",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1e293b",
+  "icons": [{
+      "src": "https://cdn-icons-png.flaticon.com/512/751/751410.png",
+      "sizes": "512x512",
+      "type": "image/png"
+  }]
+}
