@@ -1,110 +1,128 @@
-// ضع رابط التبويبة الثانية هنا
-const links = {
-    classic: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=0&single=true&output=csv",
-    enhanced: "ضع_رابط_تبويبة_Enhanced_هنا" 
+const URLS = {
+    classic: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=766279178&single=true&output=csv',
+    enhanced: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=1566031438&single=true&output=csv'
 };
 
-let currentData = [];
-const container = document.getElementById('app-container');
-const searchInput = document.getElementById('searchInput');
+let appData = { classic: [], enhanced: [] };
+let currentTab = 'classic';
 
-function loadData(type) {
-    container.innerHTML = '<div class="loader">Syncing...</div>';
-    
-    // تأكد أنك وضعت رابط التبويبة Enhanced الحقيقي في الأعلى، وإلا سيعلق التطبيق إذا اخترتها!
-    if (!links[type] || links[type].includes("ضع_رابط")) {
-        container.innerHTML = '<div class="loader" style="color:#ef4444;">Please add the Enhanced tab CSV link in app.js</div>';
-        return;
-    }
-
-    Papa.parse(links[type], {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            currentData = results.data.filter(row => row.ECAM_Message || row.ATA);
-            renderCards(currentData);
-        },
-        error: function(err) {
-            // هنا سيخبرك بوضوح إذا كان الاتصال مقطوعاً أو يحتاج بروكسي
-            container.innerHTML = '<div class="loader" style="color:#ef4444;">Network Error: Please turn on WARP / VPN to access Google Sheets.</div>';
-        }
-    });
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.error("SW Registration failed:", err));
 }
-function renderCards(data) {
+
+// Online/Offline Status
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+
+function updateNetworkStatus() {
+    const banner = document.getElementById('offline-banner');
+    if (!navigator.onLine) {
+        banner.style.display = 'block';
+    } else {
+        banner.style.display = 'none';
+        fetchData(); // Try updating when back online
+    }
+}
+updateNetworkStatus();
+
+async function fetchData() {
+    try {
+        for (const type in URLS) {
+            const response = await fetch(URLS[type]);
+            const csvText = await response.text();
+            const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+            appData[type] = result.data;
+        }
+        renderCards();
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        if (!navigator.onLine) {
+            alert("Network error: Cannot update data while offline.");
+        }
+    }
+}
+
+function switchTab(tab, btn) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderCards();
+}
+
+function startTimer(btn, seconds) {
+    if (!seconds || isNaN(seconds)) return;
+    let timeLeft = parseInt(seconds);
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    
+    const interval = setInterval(() => {
+        if (timeLeft <= 0) {
+            clearInterval(interval);
+            btn.innerHTML = "✅ Reset Complete!";
+            btn.classList.add('done');
+            setTimeout(() => { 
+                btn.disabled = false; 
+                btn.innerHTML = originalText; 
+                btn.classList.remove('done'); 
+            }, 4000);
+        } else {
+            btn.innerHTML = `⏳ Wait ${timeLeft}s...`;
+            timeLeft--;
+        }
+    }, 1000);
+}
+
+function renderCards() {
+    const query = document.getElementById('search').value.toLowerCase();
+    const container = document.getElementById('container');
     container.innerHTML = '';
-    if (data.length === 0) return container.innerHTML = '<div class="loader">No records found.</div>';
 
-    data.forEach((row, index) => {
-        const isCritical = row.Critical_Note && row.Critical_Note.toLowerCase() !== 'none';
-        const hasTimer = row.Timer_Seconds && !isNaN(row.Timer_Seconds);
+    if (!appData[currentTab].length) return;
+
+    const filteredData = appData[currentTab].filter(row => 
+        Object.values(row).some(val => String(val).toLowerCase().includes(query))
+    );
+
+    filteredData.forEach(row => {
         const card = document.createElement('div');
-        card.className = `card ${isCritical ? 'critical' : ''}`;
+        card.className = 'card';
 
-        let cbHTML = '';
-        if (row.CB_FIN && row.CB_FIN.toLowerCase() !== 'none') {
-            cbHTML = `
-                <div class="cb-container">
-                    <div class="cb-box"><span class="cb-label">FIN</span>${row.CB_FIN}</div>
-                    <div class="cb-box"><span class="cb-label">PANEL</span>${row.CB_PANEL || '-'}</div>
-                    <div class="cb-box"><span class="cb-label">LOC</span>${row.CB_LOCATION || '-'}</div>
-                </div>`;
+        // 1. Highlight CB Info
+        let cardHTML = `
+            <div class="cb-highlight">
+                <span>FIN: ${row.CB_FIN || '-'}</span>
+                <span>PANEL: ${row.CB_PANEL || '-'}</span>
+                <span>LOC: ${row.CB_LOCATION || '-'}</span>
+            </div>
+        `;
+
+        // 2. Critical Note
+        if (row.Critical_Note && row.Critical_Note.trim() !== '') {
+            cardHTML += `<div class="critical-note">⚠️ ${row.Critical_Note}</div>`;
         }
 
-        let timerHTML = hasTimer 
-            ? `<button class="timer-btn" onclick="startTimer(this, ${row.Timer_Seconds})">⏱ Start Timer (${row.Timer_Seconds}s)</button>` 
-            : '';
+        // 3. Countdown Timer
+        if (row.Timer_Seconds && !isNaN(row.Timer_Seconds)) {
+            cardHTML += `<button class="timer-btn" onclick="startTimer(this, ${row.Timer_Seconds})">⏱️ Start Timer (${row.Timer_Seconds}s)</button>`;
+        }
 
-        let criticalHTML = isCritical ? `<div class="critical-note">⚠️ ${row.Critical_Note}</div>` : '';
+        // 4. All 12 Columns
+        cardHTML += `<div class="details-grid">`;
+        Object.keys(row).forEach(key => {
+            cardHTML += `
+                <div class="detail-item">
+                    <strong>${key.replace(/_/g, ' ')}</strong>
+                    ${row[key] || '-'}
+                </div>
+            `;
+        });
+        cardHTML += `</div>`;
 
-        card.innerHTML = `
-            <h3 class="sys-title">${row.ATA} - ${row.Affected_Computer || 'SYS'}</h3>
-            <div class="ecam-msg">${row.ECAM_Message || 'Manual Reset'}</div>
-            ${cbHTML}
-            <div class="steps"><strong>Steps:</strong><br>${row.Reset_Procedure_Steps || 'Follow standard procedure.'}</div>
-            ${criticalHTML}
-            ${timerHTML}
-        `;
+        card.innerHTML = cardHTML;
         container.appendChild(card);
     });
 }
 
-window.startTimer = function(btn, seconds) {
-    if (btn.disabled) return;
-    btn.disabled = true;
-    let timeLeft = parseInt(seconds);
-    btn.style.background = "#f59e0b";
-    btn.innerText = `⏳ Wait ${timeLeft}s...`;
-    
-    const interval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft > 0) {
-            btn.innerText = `⏳ Wait ${timeLeft}s...`;
-        } else {
-            clearInterval(interval);
-            btn.style.background = "#10b981";
-            btn.innerText = "✅ CLOSE C/B NOW";
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.style.background = "#3b82f6";
-                btn.innerText = `⏱ Start Timer (${seconds}s)`;
-            }, 5000);
-        }
-    }, 1000);
-};
-
-window.switchTab = function(type, element) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    element.classList.add('active');
-    searchInput.value = '';
-    loadData(type);
-};
-
-searchInput.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = currentData.filter(row => Object.values(row).some(val => String(val).toLowerCase().includes(term)));
-    renderCards(filtered);
-});
-
-// تشغيل التطبيق بالبيانات الكلاسيكية افتراضياً
-loadData('classic');
+// Init
+fetchData();
