@@ -6,12 +6,10 @@ const URLS = {
 let appData = { classic: [], enhanced: [] };
 let currentTab = 'classic';
 
-// Service Worker Registration
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(err => console.error("SW Registration failed:", err));
 }
 
-// Online/Offline Status
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
@@ -21,7 +19,7 @@ function updateNetworkStatus() {
         banner.style.display = 'block';
     } else {
         banner.style.display = 'none';
-        fetchData(); // Try updating when back online
+        fetchData();
     }
 }
 updateNetworkStatus();
@@ -88,34 +86,22 @@ function renderCards() {
         const card = document.createElement('div');
         card.className = 'card';
 
-        // 1. Highlight CB Info (بالتصميم الجديد)
         let cardHTML = `
-            <div class="cb-highlight" style="align-items: center;">
-                <div class="cb-container">
-                  <div class="cb-red-collar">
-                    <div class="cb-black-center">
-                      <span class="cb-number">${row.CB_FIN || '-'}</span>
-                    </div>
-                  </div>
-                </div>
-                <div style="text-align: right; line-height: 1.5;">
-                    <div><span style="color:#bdc3c7;">PANEL:</span> ${row.CB_PANEL || '-'}</div>
-                    <div><span style="color:#bdc3c7;">LOC:</span> ${row.CB_LOCATION || '-'}</div>
-                </div>
+            <div class="cb-highlight">
+                <span>FIN: ${row.CB_FIN || '-'}</span>
+                <span>PANEL: ${row.CB_PANEL || '-'}</span>
+                <span>LOC: ${row.CB_LOCATION || '-'}</span>
             </div>
         `;
 
-        // 2. Critical Note
         if (row.Critical_Note && row.Critical_Note.trim() !== '') {
             cardHTML += `<div class="critical-note">⚠️ ${row.Critical_Note}</div>`;
         }
 
-        // 3. Countdown Timer
         if (row.Timer_Seconds && !isNaN(row.Timer_Seconds)) {
             cardHTML += `<button class="timer-btn" onclick="startTimer(this, ${row.Timer_Seconds})">⏱️ Start Timer (${row.Timer_Seconds}s)</button>`;
         }
 
-        // 4. All 12 Columns
         cardHTML += `<div class="details-grid">`;
         Object.keys(row).forEach(key => {
             cardHTML += `
@@ -132,5 +118,4 @@ function renderCards() {
     });
 }
 
-// Init
 fetchData();
