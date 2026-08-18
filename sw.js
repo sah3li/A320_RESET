@@ -1,4 +1,4 @@
-const CACHE_NAME = 'a320-reset-v4';
+const CACHE_NAME = 'a320-reset-v5';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
