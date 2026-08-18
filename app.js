@@ -88,12 +88,20 @@ function renderCards() {
         const card = document.createElement('div');
         card.className = 'card';
 
-        // 1. Highlight CB Info
+        // 1. Highlight CB Info (بالتصميم الجديد)
         let cardHTML = `
-            <div class="cb-highlight">
-                <span>FIN: ${row.CB_FIN || '-'}</span>
-                <span>PANEL: ${row.CB_PANEL || '-'}</span>
-                <span>LOC: ${row.CB_LOCATION || '-'}</span>
+            <div class="cb-highlight" style="align-items: center;">
+                <div class="cb-container">
+                  <div class="cb-red-collar">
+                    <div class="cb-black-center">
+                      <span class="cb-number">${row.CB_FIN || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align: right; line-height: 1.5;">
+                    <div><span style="color:#bdc3c7;">PANEL:</span> ${row.CB_PANEL || '-'}</div>
+                    <div><span style="color:#bdc3c7;">LOC:</span> ${row.CB_LOCATION || '-'}</div>
+                </div>
             </div>
         `;
 
