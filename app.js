@@ -10,6 +10,13 @@ const searchInput = document.getElementById('searchInput');
 
 function loadData(type) {
     container.innerHTML = '<div class="loader">Syncing...</div>';
+    
+    // تأكد أنك وضعت رابط التبويبة Enhanced الحقيقي في الأعلى، وإلا سيعلق التطبيق إذا اخترتها!
+    if (!links[type] || links[type].includes("ضع_رابط")) {
+        container.innerHTML = '<div class="loader" style="color:#ef4444;">Please add the Enhanced tab CSV link in app.js</div>';
+        return;
+    }
+
     Papa.parse(links[type], {
         download: true,
         header: true,
@@ -17,10 +24,13 @@ function loadData(type) {
         complete: function(results) {
             currentData = results.data.filter(row => row.ECAM_Message || row.ATA);
             renderCards(currentData);
+        },
+        error: function(err) {
+            // هنا سيخبرك بوضوح إذا كان الاتصال مقطوعاً أو يحتاج بروكسي
+            container.innerHTML = '<div class="loader" style="color:#ef4444;">Network Error: Please turn on WARP / VPN to access Google Sheets.</div>';
         }
     });
 }
-
 function renderCards(data) {
     container.innerHTML = '';
     if (data.length === 0) return container.innerHTML = '<div class="loader">No records found.</div>';
@@ -83,9 +93,9 @@ window.startTimer = function(btn, seconds) {
     }, 1000);
 };
 
-window.switchTab = function(type) {
+window.switchTab = function(type, element) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    element.classList.add('active');
     searchInput.value = '';
     loadData(type);
 };
