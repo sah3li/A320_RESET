@@ -1,45 +1,42 @@
-const CACHE_NAME = 'a320-reset-v5';
-const ASSETS_TO_CACHE = [
-    './',
-    './index.html',
-    './app.js',
-    './manifest.json',
-    'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js'
+// sw.js
+const CACHE_NAME = 'a320-reset-v1';
+const urlsToCache = [
+    '/',
+    '/index.html',
+    '/app.js',
+    '/manifest.json',
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=766279178&single=true&output=csv',
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFAC2-cGE5CGKLwrdsGdyjupmVoz4ORunlQjQEsgQTFG098SFm8C6w881-2peWiT0HZlh7VAdWjqGe/pub?gid=1566031438&single=true&output=csv'
 ];
 
 self.addEventListener('install', event => {
     self.skipWaiting();
     event.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE))
+        caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
     );
 });
 
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(keys => Promise.all(
-            keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-        ))
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+            );
+        })
     );
+    self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-    const isGoogleSheet = event.request.url.includes('docs.google.com/spreadsheets');
-
-    if (isGoogleSheet) {
-        event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    const clonedRes = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clonedRes));
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
-        );
-    } else {
-        event.respondWith(
-            caches.match(event.request).then(cachedResponse => {
-                return cachedResponse || fetch(event.request);
-            })
-        );
-    }
+    event.respondWith(
+        fetch(event.request).then(response => {
+            if (response && response.status === 200) {
+                const responseClone = response.clone();
+                caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+            }
+            return response;
+        }).catch(() => {
+            return caches.match(event.request);
+        })
+    );
 });
