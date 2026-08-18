@@ -1,148 +1,147 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html lang="ar" dir="ltr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A320 Reset Guide</title>
-    <link rel="manifest" href="./manifest.json">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <title>A320 Reset PWA</title>
+    <link rel="manifest" href="manifest.json">
     <style>
         :root {
-            --primary: #004d99;
-            --danger: #dc3545;
             --bg: #f4f7f6;
             --text: #333;
+            --primary: #0056b3;
+            --danger: #dc3545;
+            --card-bg: #fff;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
             color: var(--text);
             margin: 0;
             padding: 0;
         }
-        #offline-banner {
-            display: none;
-            background-color: var(--danger);
-            color: white;
-            text-align: center;
-            padding: 10px;
-            font-weight: bold;
-        }
         header {
             background: var(--primary);
-            color: white;
+            color: #fff;
             padding: 15px;
+            text-align: center;
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .tab-btn {
-            flex: 1;
+        #offline-alert {
+            background: var(--danger);
+            color: #fff;
+            text-align: center;
             padding: 10px;
-            background: #e0e0e0;
-            border: none;
-            border-radius: 5px;
+            display: none;
             font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
         }
-        .tab-btn.active {
-            background: #fff;
-            color: var(--primary);
+        .search-container {
+            padding: 15px;
+            background: var(--card-bg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         #search {
             width: 100%;
             padding: 12px;
-            border: none;
-            border-radius: 5px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
             box-sizing: border-box;
             font-size: 16px;
         }
-        #container {
+        .tabs {
+            display: flex;
+            cursor: pointer;
+            background: #ddd;
+        }
+        .tab {
+            flex: 1;
             padding: 15px;
-            display: grid;
-            gap: 15px;
+            text-align: center;
+            font-weight: bold;
+            user-select: none;
+            transition: background 0.3s;
+        }
+        .tab.active {
+            background: var(--primary);
+            color: #fff;
+        }
+        .container {
+            padding: 15px;
+            max-width: 800px;
+            margin: auto;
         }
         .card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            padding: 15px;
         }
         .cb-highlight {
-            background: #1a252f;
-            color: #f1c40f;
-            display: flex;
-            justify-content: space-between;
-            padding: 12px;
-            font-size: 14px;
             font-weight: bold;
+            font-size: 1.1em;
+            color: var(--primary);
+        }
+        .row-item {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            word-wrap: break-word;
+        }
+        .row-item:last-child {
+            border-bottom: none;
+        }
+        .row-item strong {
+            color: #555;
+            display: inline-block;
+            min-width: 120px;
         }
         .critical-note {
-            background: #ffebeb;
-            color: var(--danger);
-            padding: 12px;
+            background: #ffeeba;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin-top: 10px;
             font-weight: bold;
-            border-left: 5px solid var(--danger);
-            margin: 10px;
+            color: #856404;
         }
         .timer-btn {
+            width: 100%;
             background: var(--primary);
-            color: white;
+            color: #fff;
             border: none;
             padding: 12px;
-            margin: 0 10px 10px 10px;
-            border-radius: 5px;
-            font-weight: bold;
+            border-radius: 6px;
             font-size: 16px;
+            margin-top: 15px;
             cursor: pointer;
         }
         .timer-btn:disabled {
-            background: #6c757d;
+            background: #ccc;
             cursor: not-allowed;
+            color: #333;
         }
         .timer-btn.done {
             background: #28a745;
-        }
-        .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding: 15px;
-            background: #fafafa;
-            border-top: 1px solid #eee;
-        }
-        .detail-item {
-            font-size: 12px;
-            word-break: break-word;
-        }
-        .detail-item strong {
-            color: var(--primary);
-            display: block;
-            margin-bottom: 3px;
+            color: #fff;
         }
     </style>
 </head>
 <body>
-    <div id="offline-banner">⚠️ You are offline. Data might not be updated.</div>
+    <div id="offline-alert">Network Disconnected - Offline Mode</div>
     <header>
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('classic', this)">Classic</button>
-            <button class="tab-btn" onclick="switchTab('enhanced', this)">Enhanced</button>
-        </div>
-        <input type="text" id="search" placeholder="Search faults, CBs, panels..." oninput="renderCards()">
+        <h2>A320 Reset Guide</h2>
     </header>
-    
-    <div id="container"></div>
-
-    <script src="./app.js"></script>
+    <div class="search-container">
+        <input type="text" id="search" placeholder="Search Data...">
+    </div>
+    <div class="tabs">
+        <div class="tab active" data-target="classic">Classic</div>
+        <div class="tab" data-target="enhanced">Enhanced</div>
+    </div>
+    <div class="container" id="card-container"></div>
+    <script src="app.js"></script>
 </body>
 </html>
